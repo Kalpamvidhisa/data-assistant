@@ -1,54 +1,62 @@
 import streamlit as st
 import pandas as pd
 from PIL import Image
+import openai
+from gtts import gTTS
 import speech_recognition as sr
+import tempfile
+import os
 
-st.set_page_config(page_title="Data Assistant", layout="wide")
-
-st.title("🤖 Data Assistant Chatbot")
-
-# -------------------- SIDEBAR --------------------
-st.sidebar.header("📂 Inputs")
-
-uploaded_file = st.sidebar.file_uploader(
-    "Upload a CSV / Image",
-    type=["csv", "png", "jpg", "jpeg"]
+# ---------------- CONFIG ----------------
+st.set_page_config(
+    page_title="Data Assistant AI",
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-camera_image = st.sidebar.camera_input("📷 Capture Image")
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-st.sidebar.markdown("---")
-st.sidebar.info("You can chat, upload data, capture images, or use voice input.")
+st.title("🤖 Data Assistant AI")
+st.caption("Chat • CSV • Camera • Voice • AI")
 
-# -------------------- SESSION STATE --------------------
+# ---------------- SESSION ----------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "df" not in st.session_state:
     st.session_state.df = None
 
-# -------------------- FILE HANDLING --------------------
+# ---------------- SIDEBAR ----------------
+st.sidebar.header("📂 Inputs")
+
+uploaded_file = st.sidebar.file_uploader(
+    "Upload CSV / Image",
+    type=["csv", "png", "jpg", "jpeg"]
+)
+
+camera_image = st.sidebar.camera_input("📷 Capture Image")
+
+# ---------------- FILE HANDLING ----------------
 if uploaded_file:
     if uploaded_file.name.endswith(".csv"):
         st.session_state.df = pd.read_csv(uploaded_file)
-        st.sidebar.success("CSV uploaded successfully")
+        st.sidebar.success("CSV uploaded")
         st.sidebar.dataframe(st.session_state.df.head())
-
     else:
-        image = Image.open(uploaded_file)
-        st.sidebar.image(image, caption="Uploaded Image")
+        img = Image.open(uploaded_file)
+        st.sidebar.image(img, caption="Uploaded Image")
 
 if camera_image:
-    image = Image.open(camera_image)
-    st.sidebar.image(image, caption="Camera Image")
+    img = Image.open(camera_image)
+    st.sidebar.image(img, caption="Camera Image")
 
-# -------------------- CHAT HISTORY --------------------
+# ---------------- CHAT DISPLAY ----------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# -------------------- VOICE INPUT --------------------
-def voice_to_text():
+# ---------------- VOICE INPUT ----------------
+def voice_input():
     r = sr.Recognizer()
     with sr.Microphone() as source:
         st.info("🎙️ Listening...")
@@ -56,51 +64,53 @@ def voice_to_text():
     try:
         return r.recognize_google(audio)
     except:
-        return "Sorry, I could not understand."
+        return None
 
-col1, col2 = st.columns([4, 1])
+col1, col2 = st.columns([5, 1])
 with col2:
-    if st.button("🎤 Voice"):
-        voice_text = voice_to_text()
-        st.session_state.messages.append(
-            {"role": "user", "content": voice_text}
-        )
+    if st.button("🎤"):
+        voice_text = voice_input()
+        if voice_text:
+            st.session_state.messages.append(
+                {"role": "user", "content": voice_text}
+            )
 
-# -------------------- CHAT INPUT --------------------
-user_input = st.chat_input("Ask me about your data, image, or anything...")
+# ---------------- CHAT INPUT ----------------
+prompt = st.chat_input("Ask me anything…")
 
-if user_input:
+if prompt:
     st.session_state.messages.append(
-        {"role": "user", "content": user_input}
+        {"role": "user", "content": prompt}
     )
 
-    # -------------------- BOT LOGIC --------------------
-    reply = ""
-
+    # ---------------- CSV LOGIC ----------------
     if st.session_state.df is not None:
         df = st.session_state.df
-
-        if "head" in user_input.lower():
-            reply = str(df.head())
-
-        elif "columns" in user_input.lower():
-            reply = f"Columns are: {', '.join(df.columns)}"
-
-        elif "shape" in user_input.lower():
-            reply = f"Dataset shape: {df.shape}"
-
-        elif "describe" in user_input.lower():
+        if "columns" in prompt.lower():
+            reply = f"Columns: {', '.join(df.columns)}"
+        elif "shape" in prompt.lower():
+            reply = f"Shape: {df.shape}"
+        elif "describe" in prompt.lower():
             reply = str(df.describe())
-
         else:
-            reply = "📊 CSV detected. Try: head, columns, shape, describe"
+            reply = "📊 CSV loaded. Ask about columns, shape, describe."
 
+    # ---------------- IMAGE AI ----------------
     elif uploaded_file or camera_image:
-        reply = "🖼️ Image received. Image AI can be added next."
+        reply = "🖼️ Image received. Image AI description can be enabled."
 
+    # ---------------- AI CHAT ----------------
     else:
-        reply = f"You said: {user_input}"
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful data assistant."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        reply = response.choices[0].message.content
 
+    # ---------------- SAVE + DISPLAY ----------------
     st.session_state.messages.append(
         {"role": "assistant", "content": reply}
     )
@@ -108,8 +118,14 @@ if user_input:
     with st.chat_message("assistant"):
         st.write(reply)
 
-# -------------------- FOOTER --------------------
-st.markdown("---")
-st.caption("🚀 Data Assistant | Chat • CSV • Camera • Voice")
+        # ---------------- VOICE OUTPUT ----------------
+        tts = gTTS(reply)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+            tts.save(fp.name)
+            st.audio(fp.name)
+            os.unlink(fp.name)
 
+# ---------------- FOOTER ----------------
+st.markdown("---")
+st.caption("🚀 Data Assistant AI | Mobile Friendly | Powered by Streamlit")
 
