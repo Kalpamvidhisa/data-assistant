@@ -1,1 +1,7 @@
+streamlit
+pandas
+pillow
+openai
+gtts
+speechrecognition
 
