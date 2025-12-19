@@ -2,16 +2,18 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# Page config
 st.set_page_config(page_title="Data Assistant AI", layout="wide")
 
 st.title("🤖 Data Assistant AI Web App")
 
+# Upload CSV
 uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
 
-    # ================= Overview =================
+    # ================= Dataset Overview =================
     st.markdown("## 📌 Dataset Overview")
     c1, c2, c3 = st.columns(3)
     c1.metric("Rows", df.shape[0])
@@ -20,6 +22,18 @@ if uploaded_file:
 
     st.markdown("## 📄 Data Preview")
     st.dataframe(df.head())
+
+    # ================= Filter Data =================
+    st.markdown("## 🔎 Filter Data")
+
+    filter_col = st.selectbox("Select column to filter", df.columns)
+    filter_val = st.selectbox(
+        "Select value",
+        df[filter_col].dropna().unique()
+    )
+
+    filtered_df = df[df[filter_col] == filter_val]
+    st.dataframe(filtered_df)
 
     # ================= Ask Your Data =================
     st.markdown("## 🧠 Ask Your Data")
@@ -49,17 +63,16 @@ if uploaded_file:
         st.dataframe(df[col].value_counts().head(10))
 
     elif question == "Show correlation":
-        numeric_df = df.select_dtypes(include="number")
-        if numeric_df.shape[1] >= 2:
-            corr = numeric_df.corr()
-            st.dataframe(corr)
+        num_df = df.select_dtypes(include="number")
+        if num_df.shape[1] > 1:
+            st.dataframe(num_df.corr())
         else:
             st.warning("Not enough numeric columns")
 
     # ================= Visualization =================
     st.markdown("## 📊 Visualization")
 
-    chart_col = st.selectbox("Select column", df.columns)
+    chart_col = st.selectbox("Select column for chart", df.columns)
 
     if df[chart_col].dtype != "object":
         fig, ax = plt.subplots()
@@ -68,12 +81,21 @@ if uploaded_file:
     else:
         st.bar_chart(df[chart_col].value_counts())
 
-    # ================= Download =================
+    # ================= Download Section =================
     st.markdown("## ⬇️ Download Data")
 
+    # Full dataset download
     st.download_button(
         "Download Full Dataset",
         df.to_csv(index=False),
-        file_name="dataset.csv",
+        file_name="full_dataset.csv",
+        mime="text/csv"
+    )
+
+    # Filtered dataset download
+    st.download_button(
+        "Download Filtered Dataset",
+        filtered_df.to_csv(index=False),
+        file_name="filtered_dataset.csv",
         mime="text/csv"
     )
