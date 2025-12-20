@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 
 # -------------------------------
 # Page Config
@@ -12,51 +11,43 @@ st.set_page_config(
 )
 
 # -------------------------------
-# Simple Admin Database (Demo)
-# -------------------------------
-ADMINS = {
-    "admin": "admin123"
-}
-
-# -------------------------------
 # Session State
 # -------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+
 if "username" not in st.session_state:
-    st.session_state.username = None
-if "role" not in st.session_state:
-    st.session_state.role = "guest"  # default for public
+    st.session_state.username = ""
 
 # -------------------------------
-# Login Page
+# Login / Public Access
 # -------------------------------
-def login():
+def login_page():
     st.title("🔐 Login / Public Access")
+
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Admin Login")
-        username = st.text_input("Username", key="login_user")
-        password = st.text_input("Password", type="password", key="login_pass")
+        st.subheader("Admin / Registered Login (Optional)")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+
         if st.button("Login"):
-            if username in ADMINS and ADMINS[username] == password:
+            # Any username allowed
+            if username:
                 st.session_state.logged_in = True
                 st.session_state.username = username
-                st.session_state.role = "admin"
-                st.success(f"✅ Admin login successful: {username}")
+                st.success(f"✅ Logged in as {username}")
                 st.rerun()
             else:
-                st.error("❌ Invalid username or password")
+                st.error("Enter a username to login")
 
     with col2:
         st.subheader("Public Access")
-        st.write("Continue as a guest to use the app without login")
         if st.button("Continue as Guest"):
             st.session_state.logged_in = True
             st.session_state.username = "Guest"
-            st.session_state.role = "guest"
-            st.success("✅ You are now using the app as Guest")
+            st.success("✅ Continuing as Guest")
             st.rerun()
 
 # -------------------------------
@@ -64,45 +55,47 @@ def login():
 # -------------------------------
 def logout():
     st.session_state.logged_in = False
-    st.session_state.username = None
-    st.session_state.role = "guest"
+    st.session_state.username = ""
     st.rerun()
 
 # -------------------------------
-# If NOT logged in → show login
+# Show login page if not logged in
 # -------------------------------
 if not st.session_state.logged_in:
-    login()
+    login_page()
 
 # -------------------------------
-# MAIN APP (After Login)
+# Main App After Login
 # -------------------------------
 else:
     # Sidebar
     st.sidebar.title("📌 Navigation")
-    st.sidebar.write(f"👤 User: **{st.session_state.username}** ({st.session_state.role})")
+    st.sidebar.write(f"👤 User: **{st.session_state.username}**")
 
-    menu_items = ["Welcome", "Upload & Overview", "Dashboard", "Data Preview", "Filter & Download", "Visualizations"]
-    
-    # Admin can have extra menu later if needed
-    menu = st.sidebar.radio("Go to", menu_items)
+    menu = st.sidebar.radio(
+        "Go to",
+        [
+            "Welcome",
+            "Upload & Overview",
+            "Dashboard",
+            "Data Preview",
+            "Filter & Download",
+            "Visualizations"
+        ]
+    )
 
     if st.sidebar.button("🚪 Logout"):
         logout()
-    
-    st.sidebar.markdown("---")
-    st.sidebar.info("💡 Data Assistant AI Web App")
 
-    # -------------------------------
-    # Welcome Page
-    # -------------------------------
+    # Main Title
+    st.title("🤖 Data Assistant AI Web App")
+
+    # Welcome page
     if menu == "Welcome":
-        st.success(f"👋 Welcome {st.session_state.username}!")
-        st.write("Use the sidebar to navigate and explore the dataset features.")
+        st.success(f"Welcome **{st.session_state.username}** 👋")
+        st.write("This is your Data Assistant Web App")
 
-    # -------------------------------
     # Upload CSV
-    # -------------------------------
     uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 
     if uploaded_file is not None:
@@ -124,14 +117,9 @@ else:
         # -------------------------------
         elif menu == "Dashboard":
             st.markdown("## 📌 Performance Dashboard")
-            if len(numeric_cols) >= 3:
-                c1, c2, c3 = st.columns(3)
-                c1.metric("📘 Avg Score 1", round(df[numeric_cols[0]].mean(), 2))
-                c2.metric("📗 Avg Score 2", round(df[numeric_cols[1]].mean(), 2))
-                c3.metric("📕 Avg Score 3", round(df[numeric_cols[2]].mean(), 2))
-            if "gender" in df.columns:
-                st.markdown("### 👩‍🎓👨‍🎓 Gender-wise Analysis")
-                st.bar_chart(df.groupby("gender")[numeric_cols].mean())
+            if len(numeric_cols) > 0:
+                for col in numeric_cols:
+                    st.metric(f"Avg {col}", round(df[col].mean(), 2))
 
         # -------------------------------
         # Data Preview
@@ -147,37 +135,24 @@ else:
             st.markdown("## 🔎 Filter Dataset")
             filter_col = st.selectbox("Select column", df.columns)
             filter_val = st.selectbox("Select value", df[filter_col].astype(str).unique())
-            
             filtered_df = df[df[filter_col].astype(str) == filter_val]
             st.dataframe(filtered_df, use_container_width=True)
-            
-            st.markdown("## ⬇️ Download")
-            st.download_button(
-                "Download Full Dataset",
-                df.to_csv(index=False).encode("utf-8"),
-                "full_dataset.csv",
-                "text/csv"
-            )
-            st.download_button(
-                "Download Filtered Dataset",
-                filtered_df.to_csv(index=False).encode("utf-8"),
-                "filtered_dataset.csv",
-                "text/csv"
-            )
+
+            st.download_button("Download Full Dataset", df.to_csv(index=False).encode(), "full_dataset.csv")
+            st.download_button("Download Filtered Dataset", filtered_df.to_csv(index=False).encode(), "filtered_dataset.csv")
 
         # -------------------------------
         # Visualizations
         # -------------------------------
         elif menu == "Visualizations":
             st.markdown("## 📈 Data Visualization")
-            selected_col = st.selectbox("Select numeric column", numeric_cols)
-            chart_type = st.radio("Select chart type", ["Line Chart", "Bar Chart"])
-            
-            if chart_type == "Line Chart":
-                st.line_chart(df[selected_col])
-            else:
-                st.bar_chart(df[selected_col])
+            if len(numeric_cols) > 0:
+                selected_col = st.selectbox("Select numeric column", numeric_cols)
+                chart_type = st.radio("Select chart type", ["Line Chart", "Bar Chart"])
+                if chart_type == "Line Chart":
+                    st.line_chart(df[selected_col])
+                else:
+                    st.bar_chart(df[selected_col])
 
     else:
-        if menu != "Welcome":
-            st.warning("⬆️ Please upload a CSV file to continue")
+        st.warning("⬆️ Please upload a CSV file to continue")
