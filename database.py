@@ -1,13 +1,10 @@
 import sqlite3
 
-def get_connection():
-    return sqlite3.connect("users.db", check_same_thread=False)
+def init_db():
+    conn = sqlite3.connect("users.db")
+    c = conn.cursor()
 
-def create_tables():
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
+    c.execute("""
     CREATE TABLE IF NOT EXISTS users (
         email TEXT PRIMARY KEY,
         password TEXT,
@@ -15,11 +12,13 @@ def create_tables():
     )
     """)
 
-    # Default admin
-    cur.execute("""
-    INSERT OR IGNORE INTO users (email, password, role)
-    VALUES ('admin@gmail.com', 'admin123', 'admin')
-    """)
+    # Create default admin if not exists
+    c.execute("SELECT * FROM users WHERE email='admin@gmail.com'")
+    if not c.fetchone():
+        c.execute(
+            "INSERT INTO users VALUES (?, ?, ?)",
+            ("admin@gmail.com", "admin123", "admin")
+        )
 
     conn.commit()
     conn.close()
