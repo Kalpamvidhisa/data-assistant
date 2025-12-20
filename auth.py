@@ -1,37 +1,49 @@
-from database import get_connection
+import sqlite3
 
 def login_user(email, password):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
+    conn = sqlite3.connect("users.db")
+    c = conn.cursor()
+
+    c.execute(
         "SELECT role FROM users WHERE email=? AND password=?",
         (email, password)
     )
-    result = cur.fetchone()
+    result = c.fetchone()
     conn.close()
-    return result
 
-def add_user(email, password):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT OR IGNORE INTO users VALUES (?, ?, 'user')",
+    return result[0] if result else None
+
+
+def signup_user(email, password):
+    conn = sqlite3.connect("users.db")
+    c = conn.cursor()
+
+    c.execute("SELECT email FROM users WHERE email=?", (email,))
+    if c.fetchone():
+        conn.close()
+        return False
+
+    c.execute(
+        "INSERT INTO users VALUES (?, ?, 'user')",
         (email, password)
     )
     conn.commit()
     conn.close()
+    return True
 
-def delete_user(email):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM users WHERE email=?", (email,))
-    conn.commit()
-    conn.close()
 
 def get_all_users():
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT email, role FROM users")
-    users = cur.fetchall()
+    conn = sqlite3.connect("users.db")
+    c = conn.cursor()
+    c.execute("SELECT email, role FROM users")
+    users = c.fetchall()
     conn.close()
     return users
+
+
+def delete_user(email):
+    conn = sqlite3.connect("users.db")
+    c = conn.cursor()
+    c.execute("DELETE FROM users WHERE email=?", (email,))
+    conn.commit()
+    conn.close()
