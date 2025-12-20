@@ -12,11 +12,10 @@ st.set_page_config(
 )
 
 # -------------------------------
-# Simple User Database (Demo)
+# Simple Admin Database (Demo)
 # -------------------------------
-USERS = {
-    "admin": "admin123",
-    "vidhisa": "data123"
+ADMINS = {
+    "admin": "admin123"
 }
 
 # -------------------------------
@@ -24,26 +23,41 @@ USERS = {
 # -------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-
 if "username" not in st.session_state:
     st.session_state.username = None
+if "role" not in st.session_state:
+    st.session_state.role = "guest"  # default for public
 
 # -------------------------------
 # Login Page
 # -------------------------------
 def login():
-    st.title("🔐 Login to Data Assistant")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        if username in USERS and USERS[username] == password:
+    st.title("🔐 Login / Public Access")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Admin Login")
+        username = st.text_input("Username", key="login_user")
+        password = st.text_input("Password", type="password", key="login_pass")
+        if st.button("Login"):
+            if username in ADMINS and ADMINS[username] == password:
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.session_state.role = "admin"
+                st.success(f"✅ Admin login successful: {username}")
+                st.rerun()
+            else:
+                st.error("❌ Invalid username or password")
+
+    with col2:
+        st.subheader("Public Access")
+        st.write("Continue as a guest to use the app without login")
+        if st.button("Continue as Guest"):
             st.session_state.logged_in = True
-            st.session_state.username = username
-            st.success(f"✅ Login successful! Welcome {username}")
+            st.session_state.username = "Guest"
+            st.session_state.role = "guest"
+            st.success("✅ You are now using the app as Guest")
             st.rerun()
-        else:
-            st.error("❌ Invalid username or password")
 
 # -------------------------------
 # Logout
@@ -51,6 +65,7 @@ def login():
 def logout():
     st.session_state.logged_in = False
     st.session_state.username = None
+    st.session_state.role = "guest"
     st.rerun()
 
 # -------------------------------
@@ -65,42 +80,35 @@ if not st.session_state.logged_in:
 else:
     # Sidebar
     st.sidebar.title("📌 Navigation")
-    st.sidebar.write(f"👤 User: **{st.session_state.username}**")
+    st.sidebar.write(f"👤 User: **{st.session_state.username}** ({st.session_state.role})")
+
+    menu_items = ["Welcome", "Upload & Overview", "Dashboard", "Data Preview", "Filter & Download", "Visualizations"]
     
-    menu = st.sidebar.radio(
-        "Go to",
-        [
-            "Welcome",
-            "Upload & Overview",
-            "Dashboard",
-            "Data Preview",
-            "Filter & Download",
-            "Visualizations"
-        ]
-    )
-    
+    # Admin can have extra menu later if needed
+    menu = st.sidebar.radio("Go to", menu_items)
+
     if st.sidebar.button("🚪 Logout"):
         logout()
     
     st.sidebar.markdown("---")
     st.sidebar.info("💡 Data Assistant AI Web App")
-    
+
     # -------------------------------
     # Welcome Page
     # -------------------------------
     if menu == "Welcome":
         st.success(f"👋 Welcome {st.session_state.username}!")
-        st.write("This is your Data Assistant Web App. Use the sidebar to navigate.")
-    
+        st.write("Use the sidebar to navigate and explore the dataset features.")
+
     # -------------------------------
     # Upload CSV
     # -------------------------------
     uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
-    
+
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         numeric_cols = df.select_dtypes(include="number").columns
-        
+
         # -------------------------------
         # Upload & Overview
         # -------------------------------
@@ -110,7 +118,7 @@ else:
             col1.metric("Rows", df.shape[0])
             col2.metric("Columns", df.shape[1])
             col3.metric("Missing Values", df.isnull().sum().sum())
-        
+
         # -------------------------------
         # Dashboard
         # -------------------------------
@@ -124,14 +132,14 @@ else:
             if "gender" in df.columns:
                 st.markdown("### 👩‍🎓👨‍🎓 Gender-wise Analysis")
                 st.bar_chart(df.groupby("gender")[numeric_cols].mean())
-        
+
         # -------------------------------
         # Data Preview
         # -------------------------------
         elif menu == "Data Preview":
             st.markdown("## 📄 Dataset Preview")
             st.dataframe(df, use_container_width=True)
-        
+
         # -------------------------------
         # Filter & Download
         # -------------------------------
@@ -156,7 +164,7 @@ else:
                 "filtered_dataset.csv",
                 "text/csv"
             )
-        
+
         # -------------------------------
         # Visualizations
         # -------------------------------
@@ -169,7 +177,7 @@ else:
                 st.line_chart(df[selected_col])
             else:
                 st.bar_chart(df[selected_col])
-    
+
     else:
         if menu != "Welcome":
             st.warning("⬆️ Please upload a CSV file to continue")
