@@ -1,101 +1,127 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 
-# Page config
-st.set_page_config(page_title="Data Assistant AI", layout="wide")
+# -------------------------------
+# Page Configuration
+# -------------------------------
+st.set_page_config(
+    page_title="Data Assistant AI Web App",
+    page_icon="🤖",
+    layout="wide"
+)
 
+# -------------------------------
+# Sidebar Navigation
+# -------------------------------
+st.sidebar.title("📌 Navigation")
+menu = st.sidebar.radio(
+    "Go to",
+    [
+        "Upload & Overview",
+        "Dashboard",
+        "Data Preview",
+        "Filter & Download",
+        "Visualizations"
+    ]
+)
+
+st.sidebar.markdown("---")
+st.sidebar.info("💡 Data Assistant Mini Project")
+
+# -------------------------------
+# Main Title
+# -------------------------------
 st.title("🤖 Data Assistant AI Web App")
 
+# -------------------------------
 # Upload CSV
+# -------------------------------
 uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 
-if uploaded_file:
+if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
+    numeric_cols = df.select_dtypes(include="number").columns
 
-    # ================= Dataset Overview =================
-    st.markdown("## 📌 Dataset Overview")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Rows", df.shape[0])
-    c2.metric("Columns", df.shape[1])
-    c3.metric("Missing Values", df.isnull().sum().sum())
+    # ===============================
+    # PAGE 1: Upload & Overview
+    # ===============================
+    if menu == "Upload & Overview":
+        st.markdown("## 📊 Dataset Overview")
 
-    st.markdown("## 📄 Data Preview")
-    st.dataframe(df.head())
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Rows", df.shape[0])
+        col2.metric("Columns", df.shape[1])
+        col3.metric("Missing Values", df.isnull().sum().sum())
 
-    # ================= Filter Data =================
-    st.markdown("## 🔎 Filter Data")
+    # ===============================
+    # PAGE 2: Dashboard (Boards)
+    # ===============================
+    elif menu == "Dashboard":
+        st.markdown("## 📌 Performance Dashboard")
 
-    filter_col = st.selectbox("Select column to filter", df.columns)
-    filter_val = st.selectbox(
-        "Select value",
-        df[filter_col].dropna().unique()
-    )
+        if len(numeric_cols) >= 3:
+            c1, c2, c3 = st.columns(3)
+            c1.metric("📘 Avg Score 1", round(df[numeric_cols[0]].mean(), 2))
+            c2.metric("📗 Avg Score 2", round(df[numeric_cols[1]].mean(), 2))
+            c3.metric("📕 Avg Score 3", round(df[numeric_cols[2]].mean(), 2))
 
-    filtered_df = df[df[filter_col] == filter_val]
-    st.dataframe(filtered_df)
+        if "gender" in df.columns:
+            st.markdown("### 👩‍🎓👨‍🎓 Gender-wise Analysis")
+            st.bar_chart(df.groupby("gender")[numeric_cols].mean())
 
-    # ================= Ask Your Data =================
-    st.markdown("## 🧠 Ask Your Data")
+    # ===============================
+    # PAGE 3: Data Preview
+    # ===============================
+    elif menu == "Data Preview":
+        st.markdown("## 📄 Dataset Preview")
+        st.dataframe(df, use_container_width=True)
 
-    question = st.selectbox(
-        "Choose a question",
-        [
-            "Show column names",
-            "Show data types",
-            "Show missing values",
-            "Show top values of a column",
-            "Show correlation"
-        ]
-    )
+    # ===============================
+    # PAGE 4: Filter & Download
+    # ===============================
+    elif menu == "Filter & Download":
+        st.markdown("## 🔎 Filter Dataset")
 
-    if question == "Show column names":
-        st.write(df.columns.tolist())
+        filter_col = st.selectbox("Select column", df.columns)
+        filter_val = st.selectbox(
+            "Select value",
+            df[filter_col].astype(str).unique()
+        )
 
-    elif question == "Show data types":
-        st.dataframe(df.dtypes.astype(str))
+        filtered_df = df[df[filter_col].astype(str) == filter_val]
 
-    elif question == "Show missing values":
-        st.dataframe(df.isnull().sum())
+        st.write("### Filtered Data")
+        st.dataframe(filtered_df, use_container_width=True)
 
-    elif question == "Show top values of a column":
-        col = st.selectbox("Select column", df.columns)
-        st.dataframe(df[col].value_counts().head(10))
+        st.markdown("## ⬇️ Download")
 
-    elif question == "Show correlation":
-        num_df = df.select_dtypes(include="number")
-        if num_df.shape[1] > 1:
-            st.dataframe(num_df.corr())
+        st.download_button(
+            "Download Full Dataset",
+            df.to_csv(index=False).encode("utf-8"),
+            "full_dataset.csv",
+            "text/csv"
+        )
+
+        st.download_button(
+            "Download Filtered Dataset",
+            filtered_df.to_csv(index=False).encode("utf-8"),
+            "filtered_dataset.csv",
+            "text/csv"
+        )
+
+    # ===============================
+    # PAGE 5: Visualizations
+    # ===============================
+    elif menu == "Visualizations":
+        st.markdown("## 📈 Data Visualization")
+
+        selected_col = st.selectbox("Select numeric column", numeric_cols)
+        chart_type = st.radio("Select chart type", ["Line Chart", "Bar Chart"])
+
+        if chart_type == "Line Chart":
+            st.line_chart(df[selected_col])
         else:
-            st.warning("Not enough numeric columns")
+            st.bar_chart(df[selected_col])
 
-    # ================= Visualization =================
-    st.markdown("## 📊 Visualization")
-
-    chart_col = st.selectbox("Select column for chart", df.columns)
-
-    if df[chart_col].dtype != "object":
-        fig, ax = plt.subplots()
-        df[chart_col].hist(ax=ax)
-        st.pyplot(fig)
-    else:
-        st.bar_chart(df[chart_col].value_counts())
-
-    # ================= Download Section =================
-    st.markdown("## ⬇️ Download Data")
-
-    # Full dataset download
-    st.download_button(
-        "Download Full Dataset",
-        df.to_csv(index=False),
-        file_name="full_dataset.csv",
-        mime="text/csv"
-    )
-
-    # Filtered dataset download
-    st.download_button(
-        "Download Filtered Dataset",
-        filtered_df.to_csv(index=False),
-        file_name="filtered_dataset.csv",
-        mime="text/csv"
-    )
+else:
+    st.warning("⬆️ Please upload a CSV file to start using the app")
