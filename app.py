@@ -1,90 +1,175 @@
 import streamlit as st
-from database import init_db
-from auth import login_user, signup_user, get_all_users, delete_user
+import pandas as pd
+import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Data Assistant", layout="wide")
-init_db()
+# -------------------------------
+# Page Config
+# -------------------------------
+st.set_page_config(
+    page_title="Data Assistant AI Web App",
+    page_icon="🤖",
+    layout="wide"
+)
 
-# Session state
+# -------------------------------
+# Simple User Database (Demo)
+# -------------------------------
+USERS = {
+    "admin": "admin123",
+    "vidhisa": "data123"
+}
+
+# -------------------------------
+# Session State
+# -------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-# ---------------- LOGIN & SIGNUP ---------------- #
+if "username" not in st.session_state:
+    st.session_state.username = None
+
+# -------------------------------
+# Login Page
+# -------------------------------
+def login():
+    st.title("🔐 Login to Data Assistant")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    
+    if st.button("Login"):
+        if username in USERS and USERS[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.success(f"✅ Login successful! Welcome {username}")
+            st.rerun()
+        else:
+            st.error("❌ Invalid username or password")
+
+# -------------------------------
+# Logout
+# -------------------------------
+def logout():
+    st.session_state.logged_in = False
+    st.session_state.username = None
+    st.rerun()
+
+# -------------------------------
+# If NOT logged in → show login
+# -------------------------------
 if not st.session_state.logged_in:
+    login()
 
-    st.title("🔐 Data Assistant Login")
-
-    tab1, tab2 = st.tabs(["Login", "Sign Up"])
-
-    with tab1:
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-
-        if st.button("Login"):
-            role = login_user(email, password)
-            if role:
-                st.session_state.logged_in = True
-                st.session_state.role = role
-                st.session_state.email = email
-                st.success("Login successful")
-                st.rerun()
-            else:
-                st.error("Invalid email or password")
-
-    with tab2:
-        new_email = st.text_input("New Email")
-        new_password = st.text_input("New Password", type="password")
-
-        if st.button("Create Account"):
-            if signup_user(new_email, new_password):
-                st.success("Account created! Please login.")
-            else:
-                st.warning("Email already exists")
-
-    st.markdown("🔒 **Forgot Password?** Contact Admin")
-
-# ---------------- AFTER LOGIN ---------------- #
+# -------------------------------
+# MAIN APP (After Login)
+# -------------------------------
 else:
-    st.sidebar.title("📊 Navigation")
-    page = st.sidebar.radio(
+    # Sidebar
+    st.sidebar.title("📌 Navigation")
+    st.sidebar.write(f"👤 User: **{st.session_state.username}**")
+    
+    menu = st.sidebar.radio(
         "Go to",
-        ["Welcome", "Dataset Overview", "Admin Panel", "Logout"]
-        if st.session_state.role == "admin"
-        else ["Welcome", "Dataset Overview", "Logout"]
+        [
+            "Welcome",
+            "Upload & Overview",
+            "Dashboard",
+            "Data Preview",
+            "Filter & Download",
+            "Visualizations"
+        ]
     )
-
-    if page == "Welcome":
-        st.success(f"Welcome {st.session_state.email} 👋")
-        st.write("This is your Data Assistant Web App")
-
-    elif page == "Dataset Overview":
-        st.header("📁 Dataset Overview")
-        uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
-
-        if uploaded_file:
-            import pandas as pd
-            df = pd.read_csv(uploaded_file)
-            st.dataframe(df)
-
+    
+    if st.sidebar.button("🚪 Logout"):
+        logout()
+    
+    st.sidebar.markdown("---")
+    st.sidebar.info("💡 Data Assistant AI Web App")
+    
+    # -------------------------------
+    # Welcome Page
+    # -------------------------------
+    if menu == "Welcome":
+        st.success(f"👋 Welcome {st.session_state.username}!")
+        st.write("This is your Data Assistant Web App. Use the sidebar to navigate.")
+    
+    # -------------------------------
+    # Upload CSV
+    # -------------------------------
+    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+    
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+        numeric_cols = df.select_dtypes(include="number").columns
+        
+        # -------------------------------
+        # Upload & Overview
+        # -------------------------------
+        if menu == "Upload & Overview":
+            st.markdown("## 📊 Dataset Overview")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Rows", df.shape[0])
+            col2.metric("Columns", df.shape[1])
+            col3.metric("Missing Values", df.isnull().sum().sum())
+        
+        # -------------------------------
+        # Dashboard
+        # -------------------------------
+        elif menu == "Dashboard":
+            st.markdown("## 📌 Performance Dashboard")
+            if len(numeric_cols) >= 3:
+                c1, c2, c3 = st.columns(3)
+                c1.metric("📘 Avg Score 1", round(df[numeric_cols[0]].mean(), 2))
+                c2.metric("📗 Avg Score 2", round(df[numeric_cols[1]].mean(), 2))
+                c3.metric("📕 Avg Score 3", round(df[numeric_cols[2]].mean(), 2))
+            if "gender" in df.columns:
+                st.markdown("### 👩‍🎓👨‍🎓 Gender-wise Analysis")
+                st.bar_chart(df.groupby("gender")[numeric_cols].mean())
+        
+        # -------------------------------
+        # Data Preview
+        # -------------------------------
+        elif menu == "Data Preview":
+            st.markdown("## 📄 Dataset Preview")
+            st.dataframe(df, use_container_width=True)
+        
+        # -------------------------------
+        # Filter & Download
+        # -------------------------------
+        elif menu == "Filter & Download":
+            st.markdown("## 🔎 Filter Dataset")
+            filter_col = st.selectbox("Select column", df.columns)
+            filter_val = st.selectbox("Select value", df[filter_col].astype(str).unique())
+            
+            filtered_df = df[df[filter_col].astype(str) == filter_val]
+            st.dataframe(filtered_df, use_container_width=True)
+            
+            st.markdown("## ⬇️ Download")
             st.download_button(
-                "Download Dataset",
-                df.to_csv(index=False),
-                "filtered_data.csv",
+                "Download Full Dataset",
+                df.to_csv(index=False).encode("utf-8"),
+                "full_dataset.csv",
                 "text/csv"
             )
-
-    elif page == "Admin Panel" and st.session_state.role == "admin":
-        st.header("🛠 Admin Panel")
-
-        users = get_all_users()
-        st.table(users)
-
-        delete_email = st.text_input("User email to delete")
-        if st.button("Delete User"):
-            delete_user(delete_email)
-            st.success("User deleted")
-            st.rerun()
-
-    elif page == "Logout":
-        st.session_state.clear()
-        st.rerun()
+            st.download_button(
+                "Download Filtered Dataset",
+                filtered_df.to_csv(index=False).encode("utf-8"),
+                "filtered_dataset.csv",
+                "text/csv"
+            )
+        
+        # -------------------------------
+        # Visualizations
+        # -------------------------------
+        elif menu == "Visualizations":
+            st.markdown("## 📈 Data Visualization")
+            selected_col = st.selectbox("Select numeric column", numeric_cols)
+            chart_type = st.radio("Select chart type", ["Line Chart", "Bar Chart"])
+            
+            if chart_type == "Line Chart":
+                st.line_chart(df[selected_col])
+            else:
+                st.bar_chart(df[selected_col])
+    
+    else:
+        if menu != "Welcome":
+            st.warning("⬆️ Please upload a CSV file to continue")
