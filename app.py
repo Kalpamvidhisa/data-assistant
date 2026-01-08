@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
 
 # -------------------------------
 # Page Config
@@ -20,34 +22,32 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 # -------------------------------
-# Login / Public Access
+# Login Page
 # -------------------------------
 def login_page():
     st.markdown("## 🔐 Login / Public Access")
-    
+
     col1, col2 = st.columns(2)
 
     with col1:
         st.subheader("👩‍💻 Admin / Registered Login")
-        username = st.text_input("Username", placeholder="Enter your username")
-        password = st.text_input("Password", type="password", placeholder="Enter password (optional)")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
 
         if st.button("Login"):
             if username:
                 st.session_state.logged_in = True
                 st.session_state.username = username
-                st.success(f"🎉 Logged in as **{username}**!")
+                st.success(f"Logged in as {username}")
                 st.rerun()
             else:
-                st.error("❌ Please enter a username")
+                st.error("Please enter username")
 
     with col2:
         st.subheader("🌟 Public Access")
-        st.write("Continue as a guest to use the app without login")
         if st.button("Continue as Guest"):
             st.session_state.logged_in = True
             st.session_state.username = "Guest"
-            st.success("🎉 Continuing as **Guest**")
             st.rerun()
 
 # -------------------------------
@@ -59,18 +59,18 @@ def logout():
     st.rerun()
 
 # -------------------------------
-# Show login page if not logged in
+# Show Login
 # -------------------------------
 if not st.session_state.logged_in:
     login_page()
 
 # -------------------------------
-# Main App After Login
+# Main App
 # -------------------------------
 else:
-    # Sidebar with new creative emojis
+    # Sidebar
     st.sidebar.title("🌐 Navigation Panel")
-    st.sidebar.write(f"🧑‍🎓 Welcome: **{st.session_state.username}**")
+    st.sidebar.write(f"👋 Welcome: **{st.session_state.username}**")
 
     menu = st.sidebar.radio(
         "Choose your section ✨",
@@ -80,7 +80,8 @@ else:
             "📊 Analytics Dashboard",
             "📋 Data Preview",
             "🛠️ Filter & Download",
-            "🎨 Visualizations"
+            "🎨 Visualizations",
+            "🧑‍💻 Code Editor"
         ]
     )
 
@@ -90,66 +91,139 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.info("💡 Mini Project: Data Assistant AI")
 
-    # Creative main title
-    st.markdown("""
-        <h1 style='text-align: center; color: #4B0082;'>
-            🤖✨ <span style='color:#FF4500;'>Data Assistant</span> AI Web App 🧠🎨
+    # Main Title
+    st.markdown(
+        f"""
+        <h1 style="text-align:center;color:#4B0082;">
+        🤖✨ <span style="color:#FF4500;">Data Assistant</span> AI Web App 🧠
         </h1>
-        <h3 style='text-align: center; color: #2E8B57;'>Welcome <span style='color:#FF6347;'>{username}</span>! Explore your data in a fun and interactive way 🚀</h3>
-        """.format(username=st.session_state.username), unsafe_allow_html=True)
+        <h3 style="text-align:center;color:#2E8B57;">
+        Welcome <span style="color:#FF6347;">{st.session_state.username}</span>!
+        Explore your data interactively 🚀
+        </h3>
+        """,
+        unsafe_allow_html=True
+    )
 
     # Upload CSV
-    uploaded_file = st.file_uploader("📂 Upload your CSV file", type=["csv"], help="Drag & drop your CSV file here")
+    uploaded_file = st.file_uploader(
+        "📂 Upload your CSV file",
+        type=["csv"],
+        help="Upload a CSV file"
+    )
 
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         numeric_cols = df.select_dtypes(include="number").columns
 
+        # -------------------------------
         # Upload & Overview
+        # -------------------------------
         if menu == "🗂️ Upload & Overview":
-            st.markdown("## 📊 Dataset Overview")
+            st.subheader("📊 Dataset Overview")
             col1, col2, col3 = st.columns(3)
-            col1.metric("📝 Rows", df.shape[0])
-            col2.metric("📐 Columns", df.shape[1])
-            col3.metric("⚠️ Missing Values", df.isnull().sum().sum())
+            col1.metric("Rows", df.shape[0])
+            col2.metric("Columns", df.shape[1])
+            col3.metric("Missing Values", df.isnull().sum().sum())
 
-        # Dashboard
+        # -------------------------------
+        # Analytics Dashboard
+        # -------------------------------
         elif menu == "📊 Analytics Dashboard":
-            st.markdown("## 📈 Performance Dashboard")
+            st.subheader("📈 Analytics Dashboard")
+
             if len(numeric_cols) > 0:
                 for col in numeric_cols:
-                    st.metric(f"📊 Avg {col}", round(df[col].mean(), 2))
+                    st.metric(f"Average {col}", round(df[col].mean(), 2))
 
-            if "gender" in df.columns:
-                st.markdown("### 👩‍🎓👨‍🎓 Gender Analysis")
-                st.bar_chart(df.groupby("gender")[numeric_cols].mean())
-
+        # -------------------------------
         # Data Preview
+        # -------------------------------
         elif menu == "📋 Data Preview":
-            st.markdown("## 📂 Dataset Preview")
+            st.subheader("📂 Dataset Preview")
             st.dataframe(df, use_container_width=True)
 
+        # -------------------------------
         # Filter & Download
+        # -------------------------------
         elif menu == "🛠️ Filter & Download":
-            st.markdown("## 🔍 Filter Dataset")
+            st.subheader("🔍 Filter Dataset")
+
             filter_col = st.selectbox("Select column", df.columns)
-            filter_val = st.selectbox("Select value", df[filter_col].astype(str).unique())
+            filter_val = st.selectbox(
+                "Select value",
+                df[filter_col].astype(str).unique()
+            )
+
             filtered_df = df[df[filter_col].astype(str) == filter_val]
             st.dataframe(filtered_df, use_container_width=True)
 
-            st.download_button("⬇️ Download Full Dataset", df.to_csv(index=False).encode(), "full_dataset.csv")
-            st.download_button("⬇️ Download Filtered Dataset", filtered_df.to_csv(index=False).encode(), "filtered_dataset.csv")
+            st.download_button(
+                "⬇️ Download Full Dataset",
+                df.to_csv(index=False),
+                "full_dataset.csv"
+            )
 
+            st.download_button(
+                "⬇️ Download Filtered Dataset",
+                filtered_df.to_csv(index=False),
+                "filtered_dataset.csv"
+            )
+
+        # -------------------------------
         # Visualizations
+        # -------------------------------
         elif menu == "🎨 Visualizations":
-            st.markdown("## 📈 Data Visualization")
+            st.subheader("📊 Data Visualization")
+
             if len(numeric_cols) > 0:
-                selected_col = st.selectbox("Select numeric column", numeric_cols)
-                chart_type = st.radio("Select chart type", ["📈 Line Chart", "📊 Bar Chart"])
-                if chart_type == "📈 Line Chart":
-                    st.line_chart(df[selected_col])
+                col = st.selectbox("Select numeric column", numeric_cols)
+                chart = st.radio("Chart type", ["Line", "Bar"])
+
+                if chart == "Line":
+                    st.line_chart(df[col])
                 else:
-                    st.bar_chart(df[selected_col])
+                    st.bar_chart(df[col])
+
+        # -------------------------------
+        # Python Code Editor
+        # -------------------------------
+        elif menu == "🧑‍💻 Code Editor":
+            st.subheader("🧑‍💻 Python Code Editor")
+            st.info("You can use: df, pandas, numpy, matplotlib")
+
+            default_code = """
+# Example: Histogram of first numeric column
+
+import matplotlib.pyplot as plt
+
+column = df.select_dtypes(include='number').columns[0]
+plt.hist(df[column], bins=10)
+plt.title(f"Histogram of {column}")
+plt.xlabel(column)
+plt.ylabel("Frequency")
+plt.show()
+"""
+
+            user_code = st.text_area(
+                "✍️ Write Python code below:",
+                value=default_code,
+                height=300
+            )
+
+            if st.button("▶️ Run Code"):
+                try:
+                    local_env = {
+                        "df": df,
+                        "pd": pd,
+                        "np": np,
+                        "plt": plt,
+                        "st": st
+                    }
+                    exec(user_code, local_env)
+                    st.success("✅ Code executed successfully")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
 
     else:
         st.warning("⬆️ Please upload a CSV file to continue")
