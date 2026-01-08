@@ -2,162 +2,208 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import sqlite3
-import os
-import io
-from datetime import datetime
-
-# ---------- OPTIONAL REAL LLM ----------
-try:
-    from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    LLM_AVAILABLE = True
-except:
-    LLM_AVAILABLE = False
 
 # -------------------------------
 # Page Config
 # -------------------------------
 st.set_page_config(
-    page_title="Data Assistant AI",
+    page_title="🤖🧠 Data Assistant AI",
     page_icon="🧠",
     layout="wide"
 )
 
 # -------------------------------
-# Database (SQLite)
-# -------------------------------
-conn = sqlite3.connect("data_assistant.db", check_same_thread=False)
-cursor = conn.cursor()
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS chat_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    question TEXT,
-    answer TEXT,
-    time TEXT
-)
-""")
-conn.commit()
-
-# -------------------------------
 # Session State
 # -------------------------------
-for key in ["logged_in", "username"]:
-    if key not in st.session_state:
-        st.session_state[key] = False if key == "logged_in" else ""
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
 # -------------------------------
-# Login
+# Login Page
 # -------------------------------
-def login():
-    st.title("🔐 Login")
-    u = st.text_input("Username")
-    if st.button("Login"):
-        if u:
+def login_page():
+    st.markdown("## 🔐 Login / Public Access")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("👩‍💻 Admin / Registered Login")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+
+        if st.button("Login"):
+            if username:
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.success(f"Logged in as {username}")
+                st.rerun()
+            else:
+                st.error("Please enter username")
+
+    with col2:
+        st.subheader("🌟 Public Access")
+        if st.button("Continue as Guest"):
             st.session_state.logged_in = True
-            st.session_state.username = u
+            st.session_state.username = "Guest"
             st.rerun()
 
 # -------------------------------
-# LLM Chat Function
+# Logout
 # -------------------------------
-def llm_chat(question, df):
-    if not LLM_AVAILABLE:
-        return "⚠️ LLM not configured. Add API key."
-
-    schema = f"Columns: {list(df.columns)}"
-    prompt = f"""
-You are a data assistant.
-Dataset info: {schema}
-Question: {question}
-Give a clear answer.
-"""
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    return response.choices[0].message.content
+def logout():
+    st.session_state.logged_in = False
+    st.session_state.username = ""
+    st.rerun()
 
 # -------------------------------
-# App Start
+# Show Login
 # -------------------------------
 if not st.session_state.logged_in:
-    login()
+    login_page()
 
+# -------------------------------
+# Main App
+# -------------------------------
 else:
-    st.sidebar.title("⚙️ Menu")
-    st.sidebar.write(f"👤 {st.session_state.username}")
+    # Sidebar
+    st.sidebar.title("🌐 Navigation Panel")
+    st.sidebar.write(f"👋 Welcome: **{st.session_state.username}**")
 
     menu = st.sidebar.radio(
-        "Navigate",
+        "Choose your section ✨",
         [
             "🏡 Home",
-            "📂 Upload Data",
-            "🧑‍💻 Code Editor",
-            "🤖 AI Chatbot (LLM)",
-            "📜 Chat History (DB)"
+            "🗂️ Upload & Overview",
+            "📊 Analytics Dashboard",
+            "📋 Data Preview",
+            "🛠️ Filter & Download",
+            "🎨 Visualizations",
+            "🧑‍💻 Code Editor"
         ]
     )
 
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.rerun()
+    if st.sidebar.button("🚪 Logout"):
+        logout()
 
-    st.title("🤖 Data Assistant AI (LLM + SQLite)")
+    st.sidebar.markdown("---")
+    st.sidebar.info("💡 Mini Project: Data Assistant AI")
 
-    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+    # Title
+    st.markdown(
+        f"""
+        <h1 style="text-align:center;color:#4B0082;">
+        🤖✨ <span style="color:#FF4500;">Data Assistant</span> AI Web App 🧠
+        </h1>
+        <h3 style="text-align:center;color:#2E8B57;">
+        Welcome <span style="color:#FF6347;">{st.session_state.username}</span>!
+        Explore your data interactively 🚀
+        </h3>
+        """,
+        unsafe_allow_html=True
+    )
 
-    if uploaded_file:
+    # Upload CSV
+    uploaded_file = st.file_uploader("📂 Upload your CSV file", type=["csv"])
+
+    if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
+        numeric_cols = df.select_dtypes(include="number").columns
 
         # -------------------------------
-        if menu == "📂 Upload Data":
-            st.metric("Rows", df.shape[0])
-            st.metric("Columns", df.shape[1])
+        # Upload & Overview
+        # -------------------------------
+        if menu == "🗂️ Upload & Overview":
+            st.subheader("📊 Dataset Overview")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Rows", df.shape[0])
+            c2.metric("Columns", df.shape[1])
+            c3.metric("Missing Values", df.isnull().sum().sum())
+
+        # -------------------------------
+        # Analytics Dashboard
+        # -------------------------------
+        elif menu == "📊 Analytics Dashboard":
+            st.subheader("📈 Analytics Dashboard")
+            for col in numeric_cols:
+                st.metric(f"Average {col}", round(df[col].mean(), 2))
+
+        # -------------------------------
+        # Data Preview
+        # -------------------------------
+        elif menu == "📋 Data Preview":
+            st.subheader("📂 Dataset Preview")
             st.dataframe(df, use_container_width=True)
 
         # -------------------------------
+        # Filter & Download
+        # -------------------------------
+        elif menu == "🛠️ Filter & Download":
+            st.subheader("🔍 Filter Dataset")
+            col = st.selectbox("Select column", df.columns)
+            val = st.selectbox("Select value", df[col].astype(str).unique())
+            filtered_df = df[df[col].astype(str) == val]
+
+            st.dataframe(filtered_df, use_container_width=True)
+
+            st.download_button("⬇️ Download Full Dataset", df.to_csv(index=False), "full_dataset.csv")
+            st.download_button("⬇️ Download Filtered Dataset", filtered_df.to_csv(index=False), "filtered_dataset.csv")
+
+        # -------------------------------
+        # Visualizations
+        # -------------------------------
+        elif menu == "🎨 Visualizations":
+            st.subheader("📊 Data Visualization")
+            col = st.selectbox("Select numeric column", numeric_cols)
+            chart = st.radio("Chart Type", ["Line", "Bar"])
+
+            if chart == "Line":
+                st.line_chart(df[col])
+            else:
+                st.bar_chart(df[col])
+
+        # -------------------------------
+        # Python Code Editor (FINAL)
+        # -------------------------------
         elif menu == "🧑‍💻 Code Editor":
-            code = st.text_area("Python Code (use df)", height=250)
-            if st.button("Run Code"):
+            st.subheader("🧑‍💻 Python Code Editor")
+            st.info("📌 Use: df, pd, np, plt, st (No plt.show())")
+
+            default_code = """
+# Example: Histogram of first numeric column
+
+column = df.select_dtypes(include='number').columns[0]
+plt.hist(df[column], bins=10)
+plt.title(f"Histogram of {column}")
+plt.xlabel(column)
+plt.ylabel("Frequency")
+"""
+
+            user_code = st.text_area("✍️ Write Python code here:", value=default_code, height=300)
+
+            if st.button("▶️ Run Code"):
                 try:
                     fig = plt.figure()
-                    exec(code, {"df": df, "pd": pd, "np": np, "plt": plt, "st": st})
+
+                    local_env = {
+                        "df": df,
+                        "pd": pd,
+                        "np": np,
+                        "plt": plt,
+                        "st": st
+                    }
+
+                    exec(user_code, local_env)
+
                     st.pyplot(fig)
                     plt.clf()
+
+                    st.success("✅ Code executed successfully")
+
                 except Exception as e:
-                    st.error(e)
-
-        # -------------------------------
-        elif menu == "🤖 AI Chatbot (LLM)":
-            q = st.text_input("Ask about your dataset")
-            if st.button("Ask"):
-                ans = llm_chat(q, df)
-
-                cursor.execute(
-                    "INSERT INTO chat_logs VALUES (NULL, ?, ?, ?, ?)",
-                    (st.session_state.username, q, ans, datetime.now().strftime("%d-%m-%Y %H:%M"))
-                )
-                conn.commit()
-
-                st.success(ans)
-
-        # -------------------------------
-        elif menu == "📜 Chat History (DB)":
-            rows = cursor.execute(
-                "SELECT question, answer, time FROM chat_logs WHERE username=?",
-                (st.session_state.username,)
-            ).fetchall()
-
-            for q, a, t in rows:
-                st.markdown(f"**🕒 {t}**")
-                st.write(f"**Q:** {q}")
-                st.write(f"**A:** {a}")
-                st.markdown("---")
+                    st.error(f"❌ Error: {e}")
 
     else:
-        st.info("Upload a CSV file to begin")
+        st.warning("⬆️ Please upload a CSV file to continue")
